@@ -9,6 +9,13 @@ import shutil
 import json
 from datetime import datetime, timezone
 
+######### To-Do #################
+# - Create logic to update Smart Group
+# - Create logic to deploy software management plan
+# - create logic for Swift Dialog
+# - Implement logging
+##################################
+
 load_dotenv()
 
 # --- Configuration ---
@@ -148,17 +155,73 @@ def set_deployment_ring(is_minor, os_data):
     latest_os = os_data[0]
     previous_os = os_data[1]
     days_since_previous_release = calculate_days(previous_os["release_date"])
+    days_since_latest_release = calculate_days(latest_os["release_date"])
     
     if is_minor:
         if days_since_previous_release < int(MINOR_FINAL_DELAY):
             print("Previous update not finished")
+            os_to_update = previous_os["update"].split()[-1]
+            deployment_ids = calculate_deployment_ids(days_since_previous_release, is_minor)
         else:
             print("Previous update finished, continuing...")
+            os_to_update = latest_os["update"].split()[-1]
+            deployment_ids = calculate_deployment_ids(days_since_latest_release, is_minor)
     elif not is_minor:
         if days_since_previous_release < int(MAJOR_FINAL_DELAY):
             print("Previous update not finished")
+            os_to_update = previous_os["update"].split()[-1]
+            deployment_ids = calculate_deployment_ids(days_since_previous_release, is_minor)
         else:
             print("Previous update finished, continuing...")
+            os_to_update = latest_os["update"].split()[-1]
+            deployment_ids = calculate_deployment_ids(days_since_latest_release, is_minor)
+    
+    return os_to_update, deployment_ids
+
+def calculate_deployment_ids(days_past, is_minor):
+    # Define Variables
+    TEST_RING_ID = int(os.environ.get("test_ring_id"))
+
+    FIRST_RING_ID = int(os.environ.get("first_ring_id"))
+    FIRST_MINOR_DELAY = int(os.environ.get("first_minor_delay"))
+    FIRST_MAJOR_DELAY = int(os.environ.get("first_major_delay"))
+
+    FAST_RING_ID = int(os.environ.get("fast_ring_id"))
+    FAST_MINOR_DELAY = int(os.environ.get("fast_minor_delay"))
+    FAST_MAJOR_DELAY = int(os.environ.get("fast_major_delay"))
+
+    BROAD_RING_ID = int(os.environ.get("broad_ring_id"))
+    BROAD_MINOR_DELAY =int(os.environ.get("broad_minor_delay"))
+    BROAD_MAJOR_DELAY = int(os.environ.get("broad_major_delay"))
+
+    if is_minor:
+        if days_past < FIRST_MINOR_DELAY:
+            # Test Ring
+            active_groups = [TEST_RING_ID]
+        elif days_past >= FIRST_MINOR_DELAY and days_past < FAST_MINOR_DELAY:
+            # First Ring 
+            active_groups = [TEST_RING_ID, FIRST_RING_ID]
+        elif days_past >= FAST_MINOR_DELAY and days_past < BROAD_MINOR_DELAY:
+            # Fast Ring 
+            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID]
+        elif days_past >= BROAD_MINOR_DELAY:
+            # Broad Ring 
+            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID, BROAD_RING_ID]
+    elif not is_minor:
+        if days_past < FIRST_MAJOR_DELAY:
+            # Test Ring
+            active_groups = [TEST_RING_ID]
+        elif days_past >= FIRST_MAJOR_DELAY and days_past < FAST_MAJOR_DELAY:
+            # First Ring 
+            active_groups = [TEST_RING_ID, FIRST_RING_ID]
+        elif days_past >= FAST_MAJOR_DELAY and days_past < BROAD_MAJOR_DELAY:
+            # Fast Ring 
+            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID]
+        elif days_past >= BROAD_MAJOR_DELAY:
+            # Broad Ring 
+            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID, BROAD_RING_ID]
+    
+    return active_groups
 
     
 def calculate_days(release_date):
@@ -178,12 +241,24 @@ def calculate_days(release_date):
 
     return days_since
 
+def update_smart_groups():
+    print("updating groups")
+
+def create_deployment_plan():
+    print("creating plan")
+
+def deploy_swift_dialog():
+    print("deploying dialog")
+
 def main():
     get_tenant()
     json_data=get_sofa_data()
     os_data = get_os_data(json_data)
     is_minor = determine_os_difference(os_data)
-    set_deployment_ring(is_minor, os_data)
+    os_to_update, active_groups = set_deployment_ring(is_minor, os_data)
+    update_smart_groups()
+    create_deployment_plan()
+    deploy_swift_dialog()
 
 if __name__ == "__main__":
     main()
