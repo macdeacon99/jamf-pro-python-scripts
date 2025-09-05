@@ -2,3 +2,4 @@
 *.env
 *.cfg
 venv/
+output.json
