@@ -31,8 +31,6 @@ CLIENT_ID       = os.environ.get("client_id")
 CLIENT_SECRET   = os.environ.get("client_secret")
 JP_URL          = os.environ.get("jamf_url")
 
-global json_data
-
 def get_tenant():
     global sandbox
     sandbox = jamfpy.Tenant(
@@ -147,80 +145,78 @@ def compare_versions(old, new):
     
 def set_deployment_ring(is_minor, os_data):
 
-    # Define some variables from Environment Variables
-    MINOR_FINAL_DELAY = os.environ.get("minor_final_delay")
-    MAJOR_FINAL_DELAY = os.environ.get("major_final_delay")
+    # Define variables from environment
+    delays = {
+        True: int(os.environ.get("minor_final_delay")),
+        False: int(os.environ.get("major_final_delay")),
+    }
 
-    # Check days since previous deployment for update, then scope specific groups
     latest_os = os_data[0]
     previous_os = os_data[1]
-    days_since_previous_release = calculate_days(previous_os["release_date"])
-    days_since_latest_release = calculate_days(latest_os["release_date"])
-    
-    if is_minor:
-        if days_since_previous_release < int(MINOR_FINAL_DELAY):
-            print("Previous update not finished")
-            os_to_update = previous_os["update"].split()[-1]
-            deployment_ids = calculate_deployment_ids(days_since_previous_release, is_minor)
-        else:
-            print("Previous update finished, continuing...")
-            os_to_update = latest_os["update"].split()[-1]
-            deployment_ids = calculate_deployment_ids(days_since_latest_release, is_minor)
-    elif not is_minor:
-        if days_since_previous_release < int(MAJOR_FINAL_DELAY):
-            print("Previous update not finished")
-            os_to_update = previous_os["update"].split()[-1]
-            deployment_ids = calculate_deployment_ids(days_since_previous_release, is_minor)
-        else:
-            print("Previous update finished, continuing...")
-            os_to_update = latest_os["update"].split()[-1]
-            deployment_ids = calculate_deployment_ids(days_since_latest_release, is_minor)
-    
+
+    days_since = {
+        "previous": calculate_days(previous_os["release_date"]),
+        "latest": calculate_days(latest_os["release_date"]),
+    }
+
+    # Pick the right delay
+    final_delay = delays[is_minor]
+
+    # Decide whether to continue or wait
+    if days_since["previous"] < final_delay:
+        print("Previous update not finished")
+        os_to_update = previous_os["update"].split()[-1]
+        deployment_ids = calculate_deployment_ids(days_since["previous"], is_minor)
+    else:
+        print("Previous update finished, continuing...")
+        os_to_update = latest_os["update"].split()[-1]
+        deployment_ids = calculate_deployment_ids(days_since["latest"], is_minor)
+
     return os_to_update, deployment_ids
+
 
 def calculate_deployment_ids(days_past, is_minor):
     # Define Variables
-    TEST_RING_ID = int(os.environ.get("test_ring_id"))
+    rings = [
+        {
+            "name": "TEST",
+            "id": int(os.environ.get("test_ring_id", 0)),  # default to 0
+            "minor_delay": int(os.environ.get("test_minor_delay", 0)),
+            "major_delay": int(os.environ.get("test_major_delay", 0))
+        },
+        {
+            "name": "FIRST",
+            "id": int(os.environ.get("first_ring_id", 0)),
+            "minor_delay": int(os.environ.get("first_minor_delay", 0)),
+            "major_delay": int(os.environ.get("first_major_delay", 0)),
+        },
+        {
+            "name": "FAST",
+            "id": int(os.environ.get("fast_ring_id", 0)),
+            "minor_delay": int(os.environ.get("fast_minor_delay", 0)),
+            "major_delay": int(os.environ.get("fast_major_delay", 0)),
+        },
+        {
+            "name": "BROAD",
+            "id": int(os.environ.get("broad_ring_id", 0)),
+            "minor_delay": int(os.environ.get("broad_minor_delay", 0)),
+            "major_delay": int(os.environ.get("broad_major_delay", 0)),
+        }
+    ]
 
-    FIRST_RING_ID = int(os.environ.get("first_ring_id"))
-    FIRST_MINOR_DELAY = int(os.environ.get("first_minor_delay"))
-    FIRST_MAJOR_DELAY = int(os.environ.get("first_major_delay"))
+    active_groups = []
 
-    FAST_RING_ID = int(os.environ.get("fast_ring_id"))
-    FAST_MINOR_DELAY = int(os.environ.get("fast_minor_delay"))
-    FAST_MAJOR_DELAY = int(os.environ.get("fast_major_delay"))
+     # Always include TEST ring first
+    for ring in rings:
+        active_groups.append(ring["id"])
 
-    BROAD_RING_ID = int(os.environ.get("broad_ring_id"))
-    BROAD_MINOR_DELAY =int(os.environ.get("broad_minor_delay"))
-    BROAD_MAJOR_DELAY = int(os.environ.get("broad_major_delay"))
+        # Pick the right delay based on minor/major
+        delay = ring["minor_delay"] if is_minor else ring["major_delay"]
 
-    if is_minor:
-        if days_past < FIRST_MINOR_DELAY:
-            # Test Ring
-            active_groups = [TEST_RING_ID]
-        elif days_past >= FIRST_MINOR_DELAY and days_past < FAST_MINOR_DELAY:
-            # First Ring 
-            active_groups = [TEST_RING_ID, FIRST_RING_ID]
-        elif days_past >= FAST_MINOR_DELAY and days_past < BROAD_MINOR_DELAY:
-            # Fast Ring 
-            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID]
-        elif days_past >= BROAD_MINOR_DELAY:
-            # Broad Ring 
-            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID, BROAD_RING_ID]
-    elif not is_minor:
-        if days_past < FIRST_MAJOR_DELAY:
-            # Test Ring
-            active_groups = [TEST_RING_ID]
-        elif days_past >= FIRST_MAJOR_DELAY and days_past < FAST_MAJOR_DELAY:
-            # First Ring 
-            active_groups = [TEST_RING_ID, FIRST_RING_ID]
-        elif days_past >= FAST_MAJOR_DELAY and days_past < BROAD_MAJOR_DELAY:
-            # Fast Ring 
-            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID]
-        elif days_past >= BROAD_MAJOR_DELAY:
-            # Broad Ring 
-            active_groups = [TEST_RING_ID, FIRST_RING_ID, FAST_RING_ID, BROAD_RING_ID]
-    
+        # If we haven’t reached this ring’s delay yet, stop
+        if days_past < delay:
+            break
+
     return active_groups
 
     
