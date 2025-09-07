@@ -305,10 +305,36 @@ def create_deployment_plan(groups: list, os_version: str, install_date: str):
 
     response = requests.post(f"{JP_URL}/api/v1/managed-software-updates/plans/group", json=payload, headers=headers)
 
+def build_policy_scope_xml(group_ids, group_names=None):
+    """
+    Build XML scope for Jamf policy.
+    
+    :param group_ids: list of integers (required)
+    :param group_names: optional list of strings (same order as group_ids)
+    :return: XML string
+    """
+    policy = ET.Element("policy")
+    scope = ET.SubElement(policy, "scope")
+    computer_groups = ET.SubElement(scope, "computer_groups")
 
+    for i, gid in enumerate(group_ids):
+        group_elem = ET.SubElement(computer_groups, "computer_group")
+        ET.SubElement(group_elem, "id").text = str(gid)
+        if group_names and i < len(group_names):
+            ET.SubElement(group_elem, "name").text = group_names[i]
 
-def deploy_swift_dialog():
-    print("deploying dialog")
+    return ET.tostring(policy, encoding="utf-8").decode("utf-8")
+
+def deploy_swift_dialog(active_groups):
+
+    swift_dialog_policy_id = os.environ.get("swift_policy_id")
+
+    policy_scope_xml = build_policy_scope_xml(active_groups)
+
+    response = sandbox.classic.policies.update_by_id(
+        target_id = swift_dialog_policy_id,
+        updated_configuration = policy_scope_xml
+    )
 
 def main():
     json_data = get_sofa_data()
@@ -317,8 +343,8 @@ def main():
     os_to_update, active_groups, rings, release_date = set_deployment_ring(is_minor, os_data)
     install_date = calculate_install_date(active_groups, rings, is_minor, release_date)
     update_smart_groups(os_to_update)
-    # create_deployment_plan(active_groups, os_to_update, install_date)
-    deploy_swift_dialog()
+    create_deployment_plan(active_groups, os_to_update, install_date)
+    deploy_swift_dialog(active_groups)
 
 if __name__ == "__main__":
     main()
