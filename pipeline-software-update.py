@@ -7,7 +7,10 @@ import os
 import requests
 import shutil
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from dicttoxml import dicttoxml
+import xml.etree.ElementTree as ET
+from xml.dom.minidom import parseString
 
 ######### To-Do #################
 # - Create logic to update Smart Group
@@ -31,17 +34,15 @@ CLIENT_ID       = os.environ.get("client_id")
 CLIENT_SECRET   = os.environ.get("client_secret")
 JP_URL          = os.environ.get("jamf_url")
 
-def get_tenant():
-    global sandbox
-    sandbox = jamfpy.Tenant(
-        fqdn                        = JP_URL,
-        auth_method                 = "oauth2",
-        client_id                   = CLIENT_ID,
-        client_secret               = CLIENT_SECRET,
-        token_exp_threshold_mins    = 1
-    )
+sandbox = jamfpy.Tenant(
+    fqdn                        = JP_URL,
+    auth_method                 = "oauth2",
+    client_id                   = CLIENT_ID,
+    client_secret               = CLIENT_SECRET,
+    token_exp_threshold_mins    = 1
+)
 
-def get_sofa_data():
+def get_sofa_data() -> str:
     # Ensure local cache folder exists
     os.makedirs(JSON_CACHE_DIR, exist_ok=True)
 
@@ -96,7 +97,7 @@ def get_sofa_data():
 
     return json.dumps(data)
 
-def get_os_data(json_data):
+def get_os_data(json_data: str) -> list:
 
     os_data = json.loads(json_data)
 
@@ -115,7 +116,7 @@ def get_os_data(json_data):
     
     return os_list
 
-def determine_os_difference(os_data):
+def determine_os_difference(os_data: list) -> bool:
     latest_version = os_data[0]
     latest_os = latest_version["update"].split()[-1]
 
@@ -126,7 +127,7 @@ def determine_os_difference(os_data):
 
     return minor
 
-def version_to_tuple(version_str):
+def version_to_tuple(version_str: str) -> bool:
     # Split by '.' and convert each part to int
     return tuple(int(part) for part in version_str.split('.'))    
 
@@ -143,7 +144,7 @@ def compare_versions(old, new):
     else:
         return "No significate update"
     
-def set_deployment_ring(is_minor, os_data):
+def set_deployment_ring(is_minor: bool, os_data: list):
 
     # Define variables from environment
     delays = {
@@ -166,16 +167,18 @@ def set_deployment_ring(is_minor, os_data):
     if days_since["previous"] < final_delay:
         print("Previous update not finished")
         os_to_update = previous_os["update"].split()[-1]
-        deployment_ids = calculate_deployment_ids(days_since["previous"], is_minor)
+        release_date = previous_os["release_date"]
+        deployment_ids, rings = calculate_deployment_ids(days_since["previous"], is_minor)
     else:
         print("Previous update finished, continuing...")
         os_to_update = latest_os["update"].split()[-1]
-        deployment_ids = calculate_deployment_ids(days_since["latest"], is_minor)
+        release_date = latest_os["release_date"]
+        deployment_ids, rings = calculate_deployment_ids(days_since["latest"], is_minor)
 
-    return os_to_update, deployment_ids
+    return os_to_update, deployment_ids, rings, release_date
 
 
-def calculate_deployment_ids(days_past, is_minor):
+def calculate_deployment_ids(days_past: dict, is_minor: bool) -> list:
     # Define Variables
     rings = [
         {
@@ -217,10 +220,10 @@ def calculate_deployment_ids(days_past, is_minor):
         if days_past < delay:
             break
 
-    return active_groups
+    return active_groups, rings
 
     
-def calculate_days(release_date):
+def calculate_days(release_date: str) -> str:
 
     # Convert the string to a datetime object
     past_date = datetime.strptime(release_date, "%Y-%m-%dT%H:%M:%SZ")
@@ -237,23 +240,84 @@ def calculate_days(release_date):
 
     return days_since
 
-def update_smart_groups():
-    print("updating groups")
+def update_smart_groups(os_to_update: str):
 
-def create_deployment_plan():
+    group_id = os.environ.get("not_on_latest_os_id")
+
+    token = sandbox.classic.auth.token()
+
+    payload = {
+        "name": f"Not on latest OS",
+        "criteria": [
+            {
+                "name": "Operating System Version",
+                "andOr": "and",
+                "searchType": "less than",
+                "value": f"{os_to_update}"
+            }
+        ]
+    }
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "authorization": f"Bearer {token}"
+    }
+
+    response = requests.put(f"{JP_URL}/api/v2/computer-groups/smart-groups/{group_id}", json=payload, headers=headers)
+
+def calculate_install_date(groups: list, rings:list, is_minor:bool, release_date: str) -> str:
+    # Parse ISO 8601 date string (with Z at the end for UTC)
+    release_dt = datetime.strptime(release_date, "%Y-%m-%dT%H:%M:%SZ")
+
+    # Decide which delay to use based on number of groups and update type
+    length = len(groups)
+    days = rings[length]["minor_delay"] if is_minor else rings[length]["major_delay"]
+
+    # Add delay
+    install_dt = release_dt + timedelta(days=days)
+
+    # Return in format YYYY-MM-DDTHH:MM:SS
+    return install_dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def create_deployment_plan(groups: list, os_version: str, install_date: str):
     print("creating plan")
+
+    token = sandbox.pro.auth.token()
+
+    payload = {
+        "group": {
+            "objectType": "COMPUTER_GROUP",
+            "groupId": f"{groups[len(groups) - 1]}"
+        },
+        "config": {
+            "updateAction": "DOWNLOAD_INSTALL_SCHEDULE",
+            "versionType": "SPECIFIC_VERSION",
+            "specificVersion": f"{os_version}",
+            "forceInstallLocalDateTime": f"{install_date}"
+        }
+    }
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "authorization": f"Bearer {token}"
+    }
+
+    response = requests.post(f"{JP_URL}/api/v1/managed-software-updates/plans/group", json=payload, headers=headers)
+
+
 
 def deploy_swift_dialog():
     print("deploying dialog")
 
 def main():
-    get_tenant()
-    json_data=get_sofa_data()
+    json_data = get_sofa_data()
     os_data = get_os_data(json_data)
     is_minor = determine_os_difference(os_data)
-    os_to_update, active_groups = set_deployment_ring(is_minor, os_data)
-    update_smart_groups()
-    create_deployment_plan()
+    os_to_update, active_groups, rings, release_date = set_deployment_ring(is_minor, os_data)
+    install_date = calculate_install_date(active_groups, rings, is_minor, release_date)
+    update_smart_groups(os_to_update)
+    # create_deployment_plan(active_groups, os_to_update, install_date)
     deploy_swift_dialog()
 
 if __name__ == "__main__":
