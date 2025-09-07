@@ -13,8 +13,8 @@ import logging
 import sys
 
 ######### To-Do #################
-# - Implement logging
 # - Implement email report
+# - Create ReadMe.md file
 ##################################
 
 load_dotenv()
@@ -43,6 +43,7 @@ sandbox = jamfpy.Tenant(
 logging.basicConfig(
     filename="software_update.log",
     level = logging.DEBUG,
+    filemode='w',
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
