@@ -3,3 +3,4 @@
 *.cfg
 venv/
 output.json
+*.log
