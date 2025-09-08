@@ -1,0 +1,6 @@
+# Normal PyPI packages
+python-dotenv
+requests
+
+# From GitHub (replace with the actual repo + branch/tag/commit)
+git+https://github.com/someuser/jamfpy.git@main
