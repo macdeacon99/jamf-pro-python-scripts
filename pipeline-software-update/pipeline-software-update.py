@@ -140,7 +140,7 @@ def get_os_data(json_data: str) -> list:
             "release_date": release["ReleaseDate"],
             "days_since_previous_release": release["DaysSincePreviousRelease"]
         }) 
-    
+    logger.debug(f"Got OS versions: {os_list}")
     return os_list
 
 def determine_os_difference(os_data: list) -> bool:
@@ -158,11 +158,17 @@ def determine_os_difference(os_data: list) -> bool:
     previous_version = os_data[1]
     previous_os = previous_version["update"].split()[-1]
 
+    previous_2_version = os_data[2]
+    previous_2_os = previous_2_version["update"].split()[-1]
+
     # Compate the versions using helper function
     logger.info("Comparing latest and previous OS to determine if major or minor update...")
     minor = compare_versions(previous_os, latest_os)
+    previous_minor = compare_versions(previous_2_os, previous_os)
 
-    return minor
+    logger.debug(f"This is a minor update: {previous_os} -> {latest_os}") if minor else logger.debug(f"This is a major update: {previous_os} -> {latest_os}")
+
+    return minor, previous_minor
 
 def version_to_tuple(version_str: str) -> tuple:
     """
@@ -190,17 +196,15 @@ def compare_versions(previous_os: str, latest_os: str) -> bool:
     
     # Compare first number to determine if major OS update
     if latest_tuple[0] > previous_tuple[0]:
-        logger.info("Major update detected...")
         return False
     # Make sure the OS versions aren't the same
     elif previous_os != latest_os:
-        logger.info("Minor update detected...")
         return True
     else:
         logger.critical("Not able to detect if minor or major update...")
         sys.exit()
     
-def set_deployment_ring(is_minor: bool, os_data: list):
+def set_deployment_ring(is_minor: bool, os_data: list, previous_minor: bool):
     """
     Function to set the deployment rings that the update will be pushed out to based on
     environment variables.
@@ -230,11 +234,20 @@ def set_deployment_ring(is_minor: bool, os_data: list):
         "latest": calculate_days(latest_os["release_date"]),
     }
 
-    # Pick the right delay
-    final_delay = delays[is_minor]
+    # Pick the right delay - If major, then previous update must have been a minor update
+    # set delays to minor delays
+    if not is_minor:
+        final_delay = delays[not is_minor]
+        logger.debug(f"Major update, setting the previous update delay as minor: {final_delay}")
+    else:
+        # Check if previous update was a major update, if it was, set delays to major
+        final_delay = delays[is_minor] if previous_minor else delays[not is_minor]
+        logger.debug(f"Minor update, checking if previous update was a major, if so, set delay to appropriate final delay: {final_delay}")
+
 
     # Decide whether to continue or wait
     if days_since["previous"] < final_delay:
+        logger.debug(f"Only {days_since["previous"]} days since previous update released...")
         logger.info("Previous update not finished, continuing previous update...")
         os_to_update = previous_os["update"].split()[-1]
         release_date = previous_os["release_date"]
@@ -290,6 +303,7 @@ def calculate_deployment_ids(days_past: str, is_minor: bool) -> list:
 
      # Always include TEST ring first
     for ring in rings:
+        logger.debug(f"Adding {ring["name"]} to active rings...")
         active_groups.append(ring["id"])
 
         # Pick the right delay based on minor/major
@@ -324,6 +338,8 @@ def calculate_days(release_date: str) -> int:
 
     # Number of days
     days_since = delta.days
+
+    logger.debug(f"{days_since} since OS has been released...")
 
     return days_since
 
@@ -384,10 +400,12 @@ def calculate_install_date(groups: list, rings:list, is_minor:bool, release_date
 
     # Decide which delay to use based on number of groups and update type
     length = len(groups)
-    days = rings[length]["minor_delay"] if is_minor else rings[length]["major_delay"]
+    days = rings[length - 1]["minor_delay"] if is_minor else rings[length - 1]["major_delay"]
 
     # Add delay
     install_dt = release_dt + timedelta(days=days)
+
+    logger.debug(f"Force install date will be: {install_dt}")
 
     # Return in format YYYY-MM-DDTHH:MM:SS
     return install_dt.strftime("%Y-%m-%dT%H:%M:%S")
@@ -432,7 +450,7 @@ def create_deployment_plan(groups: list, os_version: str, install_date: str):
     except requests.RequestException as e:
         logger.critical(f"API was not able to create Software Update Management Plan: {e}")
 
-def build_policy_scope_xml(group_ids, group_names=None):
+def build_policy_scope_xml(group_ids: list, group_names: list = None):
     """
     Build XML scope for Jamf policy.
     
@@ -481,14 +499,16 @@ def deploy_swift_dialog(active_groups):
         logger.critical(f"Updating the Swift Dialog Policy failed: {response.status_code}")
 
 def main():
+    logger.debug("Script starting...")
     json_data = get_sofa_data()
     os_data = get_os_data(json_data)
-    is_minor = determine_os_difference(os_data)
-    os_to_update, active_groups, rings, release_date = set_deployment_ring(is_minor, os_data)
+    is_minor, previous_minor = determine_os_difference(os_data)
+    os_to_update, active_groups, rings, release_date = set_deployment_ring(is_minor, os_data, previous_minor)
     install_date = calculate_install_date(active_groups, rings, is_minor, release_date)
     update_smart_groups(os_to_update)
     create_deployment_plan(active_groups, os_to_update, install_date)
     deploy_swift_dialog(active_groups)
+    logger.debug("Script finished...")
 
 if __name__ == "__main__":
     main()
