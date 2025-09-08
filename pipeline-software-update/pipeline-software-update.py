@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 import jamfpy
-from pprint import pprint
 import requests
 import os
 import requests
@@ -355,31 +354,23 @@ def update_smart_groups(os_to_update: str):
 
     # Get group ID for 'Not on latest OS' smart group
     group_id = os.environ.get("not_on_latest_os_id")
+    group_name = os.environ.get("not_on_latest_os_name")
 
-    # Get bearer token to use API calls instead of SDK as functionality doesn't work
-    token = sandbox.classic.auth.token()
+    os_to_update = "16"
 
-    payload = {
-        "name": f"Not on latest OS",
-        "criteria": [
-            {
-                "name": "Operating System Version",
-                "andOr": "and",
-                "searchType": "less than",
-                "value": f"{os_to_update}"
-            }
-        ]
-    }
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "authorization": f"Bearer {token}"
-    }
+    group_xml = build_smart_group_xml(
+        group_id = group_id,
+        group_name = group_name,
+        os_version = os_to_update
+    )
 
     try:
-        requests.put(f"{JP_URL}/api/v2/computer-groups/smart-groups/{group_id}", json=payload, headers=headers)
-    except requests.RequestException as e:
-        logging.critical(f"Error updating Smart Group (Not on Latest OS): {e}")
+        response = sandbox.classic.computer_groups.update_by_id(
+            target_id = group_id,
+            updated_configuration = group_xml
+        )
+    except:
+        logger.critical(f"Failed to update the smart group: {response.status_code}")
         sys.exit(1)
 
 def calculate_install_date(groups: list, rings:list, is_minor:bool, release_date: str) -> str:
@@ -449,6 +440,7 @@ def create_deployment_plan(groups: list, os_version: str, install_date: str):
         requests.post(f"{JP_URL}/api/v1/managed-software-updates/plans/group", json=payload, headers=headers)
     except requests.RequestException as e:
         logger.critical(f"API was not able to create Software Update Management Plan: {e}")
+        sys.exit(1)
 
 def build_policy_scope_xml(group_ids: list, group_names: list = None):
     """
@@ -475,6 +467,44 @@ def build_policy_scope_xml(group_ids: list, group_names: list = None):
 
     return ET.tostring(policy, encoding="utf-8").decode("utf-8")
 
+def build_smart_group_xml(group_id: int, group_name: str, os_version: str) -> str:
+    """
+    Build XML for updating a smart group criteria in Jamf Classic API.
+    
+    :param group_id: ID of the smart group
+    :param group_name: Name of the smart group
+    :param os_version: New value for the Operating System Version criteria
+    :return: XML string
+    """
+    logger.info("Creating Smart Group XML...")
+
+    # Root element
+    computer_group = ET.Element("computer_group")
+
+    # Basic group info
+    ET.SubElement(computer_group, "id").text = str(group_id)
+    ET.SubElement(computer_group, "name").text = group_name
+    ET.SubElement(computer_group, "is_smart").text = "true"
+
+    # Site (Jamf requires it, even if it's NONE/-1)
+    site = ET.SubElement(computer_group, "site")
+    ET.SubElement(site, "id").text = "-1"
+    ET.SubElement(site, "name").text = "NONE"
+
+    # Criteria
+    criteria = ET.SubElement(computer_group, "criteria")
+    ET.SubElement(criteria, "size").text = "1"
+    criterion = ET.SubElement(criteria, "criterion")
+    ET.SubElement(criterion, "name").text = "Operating System Version"
+    ET.SubElement(criterion, "priority").text = "0"
+    ET.SubElement(criterion, "and_or").text = "and"
+    ET.SubElement(criterion, "search_type").text = "less than"
+    ET.SubElement(criterion, "value").text = os_version
+    ET.SubElement(criterion, "opening_paren").text = "false"
+    ET.SubElement(criterion, "closing_paren").text = "false"
+
+    return ET.tostring(computer_group, encoding="utf-8").decode("utf-8")
+
 def deploy_swift_dialog(active_groups):
     """
     Updating the Swift Dialog Policy to inform users their update is required
@@ -497,6 +527,7 @@ def deploy_swift_dialog(active_groups):
         )
     except:
         logger.critical(f"Updating the Swift Dialog Policy failed: {response.status_code}")
+        sys.exit(1)
 
 def main():
     logger.debug("Script starting...")
