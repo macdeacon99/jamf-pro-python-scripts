@@ -14,6 +14,11 @@ import sys
 ######### To-Do #################
 # - Implement email report
 # - Create ReadMe.md file
+# - Break out into multiple files
+#   - Date/Time
+#   - OS data
+#   - Jamf API
+#   - Deployment Rings
 ##################################
 
 load_dotenv()
