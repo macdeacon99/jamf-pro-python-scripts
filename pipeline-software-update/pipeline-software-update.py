@@ -99,9 +99,9 @@ def get_sofa_data() -> str:
             else:
                 logger.info("No ETag returned - JSON cache updated without ETag")
         else:
-            logging.error(f"Failed to fetch JSON feed. HTTP Status: {response.status_code}")
+            logger.error(f"Failed to fetch JSON feed. HTTP Status: {response.status_code}")
     except requests.RequestException as e:
-        logging.critical(f"Error fetching JSON feed: {e}")
+        logger.critical(f"Error fetching JSON feed: {e}")
         sys.exit(1)
 
     # Check if the cache file exists

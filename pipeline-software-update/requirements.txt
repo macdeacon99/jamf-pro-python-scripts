@@ -2,5 +2,5 @@
 python-dotenv
 requests
 
-# From GitHub (replace with the actual repo + branch/tag/commit)
+# From GitHub
 git+https://github.com/thejoeker12/jamfpy-python-sdk-jamfpro.git@main
