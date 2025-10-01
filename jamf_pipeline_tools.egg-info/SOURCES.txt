@@ -1,8 +1,0 @@
-README.md
-pyproject.toml
-jamf_deployment_ring_calculator/main.py
-jamf_pipeline_tools.egg-info/PKG-INFO
-jamf_pipeline_tools.egg-info/SOURCES.txt
-jamf_pipeline_tools.egg-info/dependency_links.txt
-jamf_pipeline_tools.egg-info/requires.txt
-jamf_pipeline_tools.egg-info/top_level.txt
