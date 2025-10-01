@@ -99,6 +99,6 @@ def main():
     devices_list = calculate_deployment_rings(computers_ids)
 
     create_smart_groups(devices_list)
-
+    
 if __name__ == "__main__":
     main()
