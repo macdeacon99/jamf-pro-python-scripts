@@ -99,12 +99,6 @@ def main():
     devices_list = calculate_deployment_rings(computers_ids)
 
     create_smart_groups(devices_list)
-
-    # Count how many devices
-    # Loop through devices and calculate how many devices per deployment ring
-    # add IDs of devices to a list of each deployment ring based on %
-    # Update the smart groups for each deployment ring
-    pass
-
+    
 if __name__ == "__main__":
     main()
