@@ -20,4 +20,11 @@ sandbox = jamfpy.Tenant(
 
 categories = sandbox.classic.categories.get_all()
 
+group = sandbox.classic.computer_groups.get_by_id(
+    target_id=210,
+    xml_response=True
+)
+
 pprint(categories.json())
+
+pprint(group.text)
