@@ -1,0 +1,1 @@
+jamf_deployment_ring_calculator

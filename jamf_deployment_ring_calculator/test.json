@@ -1,0 +1,79 @@
+{
+    "computers": [
+        {
+            "id": 1,
+            "serial_number": "AB1234",
+            "device_owner": "Gordon"
+        },
+        {
+            "id": 2,
+            "serial_number": "AB1256",
+            "device_owner": "Anna"
+        },
+        {
+            "id": 3,
+            "serial_number": "AB12234",
+            "device_owner": "Andrew"
+        },
+        {
+            "id": 1,
+            "serial_number": "AB1234",
+            "device_owner": "Gordon"
+        },
+        {
+            "id": 2,
+            "serial_number": "AB1256",
+            "device_owner": "Anna"
+        },
+        {
+            "id": 3,
+            "serial_number": "AB12234",
+            "device_owner": "Andrew"
+        },
+        {
+            "id": 1,
+            "serial_number": "AB1234",
+            "device_owner": "Gordon"
+        },
+        {
+            "id": 2,
+            "serial_number": "AB1256",
+            "device_owner": "Anna"
+        },
+        {
+            "id": 3,
+            "serial_number": "AB12234",
+            "device_owner": "Andrew"
+        },
+        {
+            "id": 1,
+            "serial_number": "AB1234",
+            "device_owner": "Gordon"
+        },
+        {
+            "id": 2,
+            "serial_number": "AB1256",
+            "device_owner": "Anna"
+        },
+        {
+            "id": 3,
+            "serial_number": "AB12234",
+            "device_owner": "Andrew"
+        },
+        {
+            "id": 1,
+            "serial_number": "AB1234",
+            "device_owner": "Gordon"
+        },
+        {
+            "id": 2,
+            "serial_number": "AB1256",
+            "device_owner": "Anna"
+        },
+        {
+            "id": 3,
+            "serial_number": "AB12234",
+            "device_owner": "Andrew"
+        }
+    ]
+}

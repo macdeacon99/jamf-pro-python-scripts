@@ -1,0 +1,28 @@
+[project]
+name = "jamf-pipeline-tools"
+version = "0.1.0"
+description = "Utilities to help Jamf Pro engineers automate their estate and minimise ongoing manual tasks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name="Gordon Deacon", email="gdeacon99@gmail.com" }
+]
+keywords = ["jamf", "deployment", "microsoft", "macos", "automation"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+# Runtime dependencies
+dependencies = [
+  "requests >= 2.28",
+  "python-dotenv >= 1.0.0",   # for loading env vars if you want
+  "tomli >= 2.0",             # read-only TOML parsing for Python <3.11; optional if using stdlib tomllib
+  "tqdm >= 4.65"              # optional progress bar helpful for batching large requests
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
