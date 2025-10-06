@@ -59,7 +59,8 @@ broad_group_id=218
 
 ---
 
-## Usage
+## ▶️ Usage
+
 
 From the project root, run:
 
@@ -74,7 +75,7 @@ This will:
 3. Generate XML payloads for each static group.
 4. Update the corresponding groups in Jamf Pro.
 
-## Development
+## 🧰 Development
 
 Install dependencies:
 
@@ -101,14 +102,15 @@ pip install -e .
 
 ---
 
-## Roadmap
+## 🛣️ Roadmap
 
 1. Change the script to check for Static Group IDs being set to `None`. If set to `None` then create groups, if not update
 2. Add a naming standard to config file and then create in the script
-3. Keep up to date
+3. Add feature where you can add specific devices that will stay in specific groups, i.e. execs or VIPs that should be in the last deployment ring
+4. Develop rationale for how to update rings. Don't want to update every day in a pipeline as it will disrupt ongoing deployments. Possible solution: Get current groups if they exist, compare to all computers, split up new computers and add them into the groups using computer additions feature of Classic API
 
 ---
 
-## Contributing
+## 🙌 Contributing
 
 PRs and issues welcome! Please open an issue to discuss changes or feature requests before submitting a PR.
