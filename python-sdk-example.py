@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import jamfpy
 from pprint import pprint
 
-load_dotenv()
+load_dotenv('/harness/.env')
 
 CLIENT_ID       = os.environ.get("client_id")
 CLIENT_SECRET   = os.environ.get("client_secret")
