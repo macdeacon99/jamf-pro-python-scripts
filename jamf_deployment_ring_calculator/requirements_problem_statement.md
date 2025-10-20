@@ -1,6 +1,6 @@
 # Deployment Ring Calculator - Requirements
 
-## Problem Statement
+## Problem Statement
 
 Creating deployment rings in **Jamf Pro** currently involves significant manual work and lacks precision. Administrators must manually select or count devices to create static groups or rely on arbitrary identifiers (e.g., UDIDs) to approximate percentage-based deployments. This approach is **inefficient, inconsistent, and prone to human error**, particularly in large-scale environments.
 
