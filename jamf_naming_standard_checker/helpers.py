@@ -1,73 +1,58 @@
+import re
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
-def build_static_computer_group_xml(
-    name: str,
-    computer_ids: list,
-    group_id: int | None = None,
-    description: str | None = None,
-    site_id: int = -1
-) -> str:
+def rename_object(resources: dict, naming_standard: dict, object_type: str, known_prefixes: list[str]) -> dict:
     """
-    Build and return a pretty-printed XML string for a Jamf Pro static computer group.
+    Takes in a name of an object from Jamf Pro and returns a new name in the format of a naming standard.
 
     Parameters:
-      name          : Name of the group (string).
-      computer_ids  : Iterable of Jamf computer IDs (integers or strings).
-      group_id      : Optional Jamf group ID (useful when updating an existing group).
-      description   : Optional description text.
-      site_id       : Jamf site id (-1 for global/default).
+      resources              : Name of the object (string).
+      naming_standard   : Naming standard to follow (string).
+      object_type       : The type of object being passed to the function (string).
 
     Returns:
-      A Unicode string containing the XML document (including XML declaration).
+      A string of the new name following the naming standard
     """
 
-    # Root
-    root = ET.Element("computer_group")
+    clean_type = object_type.lower()
 
-    # Optional group id (for update operations)
-    if group_id is not None:
-        id_el = ET.SubElement(root, "id")
-        id_el.text = str(group_id)
+    for resource in resources:
 
-    # Required fields
-    name_el = ET.SubElement(root, "name")
-    name_el.text = str(name)
+        old_name = resource.get("name")
+        clean_name = old_name.lower()
 
-    is_smart_el = ET.SubElement(root, "is_smart")
-    is_smart_el.text = "false"  # static group
+        rules = naming_standard.get(clean_type)
+        if not rules:
+            raise ValueError(f"No naming standard defined for object type: {clean_type}")
+        
+        name_no_prefix = remove_existing_prefix(clean_name, known_prefixes)
+        words = re.split(r"[\s\-\_]+", name_no_prefix)
+        base_title = " ".join(words).strip()
 
-    # Optional description
-    if description:
-        desc_el = ET.SubElement(root, "description")
-        desc_el.text = str(description)
+        formatted_title = re.sub(r"\s+", rules["separator"], base_title)
 
-    # Site block (Jamf expects a site element with id)
-    site_el = ET.SubElement(root, "site")
-    site_id_el = ET.SubElement(site_el, "id")
-    site_id_el.text = str(site_id)
+        new_name = f"{rules["prefix"]}{formatted_title}"
 
-    # Computers container
-    computers_el = ET.SubElement(root, "computers")
+        if not validate_name(new_name):
+            raise ValueError(f"Invalid name generated: {new_name}")
+        resource.update({"name": new_name})
+    return resources
 
-    # Append each computer as <computer><id>...</id></computer>
-    for cid in computer_ids:
-        comp_el = ET.SubElement(computers_el, "computer")
-        comp_id_el = ET.SubElement(comp_el, "id")
-        comp_id_el.text = str(cid)
+def remove_existing_prefix(name: str, known_prefixes: list[str]) -> str:
+    pattern = r"^(" + "|".join(re.escape(p) for p in known_prefixes) + r")(?=[-_]|$)"
+    return re.sub(pattern, "", name, flags=re.IGNORECASE)
 
-    # Serialize to string and pretty-print
-    rough = ET.tostring(root, encoding="utf-8")
-    reparsed = minidom.parseString(rough)
-    pretty_xml = reparsed.toprettyxml(indent="  ", encoding="utf-8")
-
-    # toprettyxml returns bytes when encoding provided; decode to str
-    return pretty_xml.decode("utf-8")
-
+def validate_name(name: str, max_length: int = 255) -> bool:
+    if len(name) > max_length:
+        return False
+    if not re.match(r"^[\w\s\-\_]+$", name):
+        return False
+    return True
 
 def build_policy_xml(
     name: str,
-    category: int = -1,
+    category: str = "Unknown",
     enabled: bool = True,
     trigger: str = "EVENT",
     all_computers: bool = False,
